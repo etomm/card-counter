@@ -17,6 +17,7 @@
     button{background:#132; color:var(--fg); border:1px solid #264; padding:.45rem .7rem; border-radius:.5rem; cursor:pointer}
     button.primary{background:var(--accent);border-color:#0a4;color:#021}
     #grid{padding:.5rem; display:grid; gap:.5rem; align-items:stretch; justify-items:stretch}
+    .cell{width:100%; height:100%;}
     .card{width:100%; height:100%; border-radius:.4rem; border:1px solid #2a2f2a; display:flex; align-items:center; justify-content:center; background:#0e1510; position:relative; overflow:hidden; cursor:pointer; transition:transform .05s}
     .card:active{transform:scale(.98)}
     .card img{width:100%; height:100%; object-fit:contain; padding:4px; display:block; opacity:.98; filter:drop-shadow(0 0 .2rem #000a)}
@@ -24,7 +25,7 @@
     .badge{position:absolute; inset:auto .35rem .35rem auto; background:#0009; color:#fff; font-size:.75rem; padding:.12rem .36rem; border-radius:.35rem}
     .legend{display:flex;gap:1rem; padding:.2rem .75rem; color:var(--muted); font-size:.95rem}
     .status{padding:.4rem .75rem; color:var(--muted)}
-    .grid-wrap{max-width:1400px; margin:0 auto; height:calc(100vh - 120px)} /* height adjusted at runtime */
+    .grid-wrap{max-width:1600px; margin:0 auto; height:calc(100vh - 120px)}
   </style>
 </head>
 <body>
@@ -36,7 +37,9 @@
       <button id="soloVive">Mostra solo vive</button>
       <button id="soloMorte">Mostra solo morte</button>
       <button id="tutte">Mostra tutte</button>
-      <button id="toggleMode">Auto</button>
+      <button id="mode13x4">13×4</button>
+      <button id="mode4x13">4×13</button>
+      <button id="modeAuto">Auto</button>
     </div>
     <div class="legend"> 
       <span>Vive: <strong id="count-live">52</strong></span>
@@ -58,32 +61,82 @@
   function inkColor(s){ return isRed(s) ? '#e44747' : '#eaf3ea'; }
 
   function pip(x, y, s, fontSize, rotate){ const glyph = suitGlyph(s); const rot = rotate ? ` transform='rotate(180 ${x} ${y})'` : ''; return `<text x='${x}' y='${y}' font-size='${fontSize}' text-anchor='middle' dominant-baseline='middle'${rot}>${glyph}</text>`; }
-  function cornerIndex(rank, s){ const c = inkColor(s); return `
+
+  function cornerIndex(rank, s){
+    const c = inkColor(s);
+    // top-left
+    const tl = `
       <g fill='${c}' font-family='-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif' font-weight='700'>
-        <text x='48' y='120' font-size='92'>${rank}</text>
-        <text x='48' y='190' font-size='92'>${suitGlyph(s)}</text>
-        <g transform='rotate(180 582 820)'>
-          <text x='582' y='820' font-size='92' text-anchor='end'>${rank}</text>
-          <text x='582' y='750' font-size='92' text-anchor='end'>${suitGlyph(s)}</text>
-        </g>
-      </g>`; }
+        <text x='48' y='110' font-size='88'>${rank}</text>
+        <text x='48' y='185' font-size='88'>${suitGlyph(s)}</text>
+      </g>`;
+    // bottom-right (adjusted inwards to avoid clipping)
+    const br = `
+      <g fill='${c}' font-family='-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif' font-weight='700' transform='rotate(180 582 770)'>
+        <text x='582' y='770' font-size='88' text-anchor='end'>${rank}</text>
+        <text x='582' y='700' font-size='88' text-anchor='end'>${suitGlyph(s)}</text>
+      </g>`;
+    return tl + br;
+  }
+
   function pipsForRank(rank, suit){
-    const c = inkColor(suit); const X = {L:150, CL:240, C:315, CR:390, R:480}; const Y = {T:160, UT:270, M:440, DB:610, B:720};
+    const c = inkColor(suit);
+    const X = {L:150, CL:240, C:315, CR:390, R:480};
+    const Y = {T:160, UT:270, M:440, DB:610, B:720};
+
     let content = `<g fill='${c}' font-family='-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif' font-weight='700'>`;
     const num = (rank==='A')?1 : (rank==='K'||rank==='Q'||rank==='J'?null : (rank==='10'?10:parseInt(rank)));
-    if(rank==='A'){ content += pip(315, 440, suit, 260, false);
-    } else if(num){ const fs = 120; switch(num){
-      case 2: content += pip(X.C, Y.T, suit, fs, false) + pip(X.C, Y.B, suit, fs, true); break;
-      case 3: content += pip(X.C, Y.T, suit, fs, false) + pip(X.C, Y.M, suit, fs, false) + pip(X.C, Y.B, suit, fs, true); break;
-      case 4: content += pip(X.L, Y.T, suit, fs, false) + pip(X.R, Y.T, suit, fs, false) + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true); break;
-      case 5: content += pip(X.L, Y.T, suit, fs, false) + pip(X.R, Y.T, suit, fs, false) + pip(X.C, Y.M, suit, fs, false) + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true); break;
-      case 6: content += pip(X.L, Y.T, suit, fs, false) + pip(X.R, Y.T, suit, fs, false) + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false) + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true); break;
-      case 7: content += pip(X.C, Y.T, suit, fs, false) + pip(X.L, Y.UT, suit, fs, false) + pip(X.R, Y.UT, suit, fs, false) + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false) + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true); break;
-      case 8: content += pip(X.C, Y.T, suit, fs, false) + pip(X.L, Y.UT, suit, fs, false) + pip(X.R, Y.UT, suit, fs, false) + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false) + pip(X.L, Y.DB, suit, fs, true) + pip(X.R, Y.DB, suit, fs, true) + pip(X.C, Y.B, suit, fs, true); break;
-      case 9: content += pip(X.C, Y.M, suit, fs, false) + pip(X.C, Y.T, suit, fs, false) + pip(X.C, Y.B, suit, fs, true) + pip(X.L, Y.UT, suit, fs, false) + pip(X.R, Y.UT, suit, fs, false) + pip(X.L, Y.DB, suit, fs, true) + pip(X.R, Y.DB, suit, fs, true) + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false); break;
-      case 10: content += pip(X.L, Y.T, suit, fs, false) + pip(X.R, Y.T, suit, fs, false) + pip(X.L, Y.UT, suit, fs, false) + pip(X.R, Y.UT, suit, fs, false) + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false) + pip(X.L, Y.DB, suit, fs, true) + pip(X.R, Y.DB, suit, fs, true) + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true); break; }
-    } else { const glyph = suitGlyph(suit); content += `<text x='315' y='420' font-size='260' text-anchor='middle' dominant-baseline='middle' opacity='0.95'>${rank}</text>`; content += `<text x='315' y='620' font-size='160' text-anchor='middle' dominant-baseline='middle' opacity='0.9'>${glyph}</text>`; }
-    content += '</g>'; return content;
+
+    if(rank==='A'){
+      // 10% smaller
+      content += pip(315, 440, suit, 234, false);
+    } else if(num){
+      // 10% smaller from 120 -> 108
+      const fs = 108;
+      switch(num){
+        case 2:
+          content += pip(X.C, Y.T, suit, fs, false) + pip(X.C, Y.B, suit, fs, true);
+          break;
+        case 3:
+          content += pip(X.C, Y.T, suit, fs, false) + pip(X.C, Y.M, suit, fs, false) + pip(X.C, Y.B, suit, fs, true);
+          break;
+        case 4:
+          content += pip(X.L, Y.T, suit, fs, false) + pip(X.R, Y.T, suit, fs, false) + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true);
+          break;
+        case 5:
+          content += pip(X.L, Y.T, suit, fs, false) + pip(X.R, Y.T, suit, fs, false) + pip(X.C, Y.M, suit, fs, false) + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true);
+          break;
+        case 6:
+          content += pip(X.L, Y.T, suit, fs, false) + pip(X.R, Y.T, suit, fs, false) + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false) + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true);
+          break;
+        case 7:
+          content += pip(X.C, Y.T, suit, fs, false) + pip(X.L, Y.UT, suit, fs, false) + pip(X.R, Y.UT, suit, fs, false) + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false) + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true);
+          break;
+        case 8:
+          content += pip(X.C, Y.T, suit, fs, false) + pip(X.L, Y.UT, suit, fs, false) + pip(X.R, Y.UT, suit, fs, false) + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false) + pip(X.L, Y.DB, suit, fs, true) + pip(X.R, Y.DB, suit, fs, true) + pip(X.C, Y.B, suit, fs, true);
+          break;
+        case 9:
+          content += pip(X.C, Y.M, suit, fs, false) + pip(X.C, Y.T, suit, fs, false) + pip(X.C, Y.B, suit, fs, true)
+                   + pip(X.L, Y.UT, suit, fs, false) + pip(X.R, Y.UT, suit, fs, false) + pip(X.L, Y.DB, suit, fs, true) + pip(X.R, Y.DB, suit, fs, true)
+                   + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false);
+          break;
+        case 10:
+          content += pip(X.L, Y.T, suit, fs, false) + pip(X.R, Y.T, suit, fs, false)
+                   + pip(X.L, Y.UT, suit, fs, false) + pip(X.R, Y.UT, suit, fs, false)
+                   + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false)
+                   + pip(X.L, Y.DB, suit, fs, true) + pip(X.R, Y.DB, suit, fs, true)
+                   + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true);
+          break;
+      }
+    } else {
+      // J/Q/K: keep as-is
+      const glyph = suitGlyph(suit);
+      content += `<text x='315' y='420' font-size='260' text-anchor='middle' dominant-baseline='middle' opacity='0.95'>${rank}</text>`;
+      content += `<text x='315' y='620' font-size='160' text-anchor='middle' dominant-baseline='middle' opacity='0.9'>${glyph}</text>`;
+    }
+
+    content += '</g>';
+    return content;
   }
 
   function cardSVG(rank,suit){ const bgStroke = isRed(suit)?'#a44':'#2a3'; return `data:image/svg+xml;utf8,`+encodeURIComponent(`
@@ -94,75 +147,95 @@
       ${pipsForRank(rank, suit)}
     </svg>`); }
 
-  const deck = []; for(const r of ranks){ for(const s of suits){ deck.push({id:`${r}${s}`, r, s}); } }
+  const allDeck = []; for(const r of ranks){ for(const s of suits){ allDeck.push({id:`${r}${s}`, r, s}); } }
 
   const grid = document.getElementById('grid');
   const gridWrap = document.getElementById('gridWrap');
   const header = document.querySelector('header');
-  const stateKey = 'holdem-card-state-v4';
+  const stateKey = 'holdem-card-state-v5';
   let removed = new Set(JSON.parse(localStorage.getItem(stateKey) || '[]'));
-  let mode = 'auto'; // 'auto' | 'wide' | 'narrow'
+  let mode = 'auto'; // 'auto' | '13x4' | '4x13'
+
+  function aliveSets(){
+    const alive = allDeck.filter(c=> !removed.has(c.id));
+    const aliveSuits = new Set(alive.map(c=> c.s));
+    const aliveRanks = new Set(alive.map(c=> c.r));
+    return {aliveSuits:[...aliveSuits], aliveRanks:[...aliveRanks]};
+  }
 
   function render(){
     grid.innerHTML = '';
-    for(const card of deck){
-      const el = document.createElement('button'); el.className = 'card'; el.type = 'button';
-      const img = document.createElement('img'); img.alt = `${card.r} di ${suitNames[card.s]}`; img.loading = 'lazy'; img.decoding = 'async'; img.src = cardSVG(card.r, card.s); el.appendChild(img);
-      if(removed.has(card.id)) el.classList.add('removed');
-      const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = removed.has(card.id) ? 'morta' : 'viva'; el.appendChild(badge);
-      el.addEventListener('click', ()=>{ if(removed.has(card.id)) removed.delete(card.id); else removed.add(card.id); save(); updateCounts(); el.classList.toggle('removed'); badge.textContent = removed.has(card.id) ? 'morta' : 'viva'; });
-      grid.appendChild(el);
+    const {aliveSuits, aliveRanks} = aliveSets();
+
+    // Decide axes
+    let suitsAxis = ['S','H','D','C'].filter(s=> aliveSuits.includes(s));
+    let ranksAxis = ['A','K','Q','J','10','9','8','7','6','5','4','3','2'].filter(r=> aliveRanks.includes(r));
+
+    const list = [];
+    if(currentConfig().colsBy === 'rank'){
+      // 13x4 style: rows=suits, cols=ranks
+      for(const s of suitsAxis){ for(const r of ranksAxis){ list.append?.(); list.push({r,s}); } }
+    } else {
+      // 4x13 style: rows=ranks, cols=suits
+      for(const r of ranksAxis){ for(const s of suitsAxis){ list.push({r,s}); } }
     }
+
+    for(const cs of list){
+      const id = cs.r + cs.s;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'cell';
+      const el = document.createElement('button'); el.className = 'card'; el.type = 'button';
+      const img = document.createElement('img'); img.alt = `${cs.r} di ${suitNames[cs.s]}`; img.loading = 'lazy'; img.decoding = 'async'; img.src = cardSVG(cs.r, cs.s); el.appendChild(img);
+      if(removed.has(id)) el.classList.add('removed');
+      const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = removed.has(id) ? 'morta' : 'viva'; el.appendChild(badge);
+      el.addEventListener('click', ()=>{ if(removed.has(id)) removed.delete(id); else removed.add(id); save(); updateCounts(); render(); layout(); });
+      wrapper.appendChild(el);
+      grid.appendChild(wrapper);
+    }
+  }
+
+  function currentConfig(){
+    if(mode === '13x4') return {colsBy:'rank'};
+    if(mode === '4x13') return {colsBy:'suit'};
+    // auto: decide by aspect ratio
+    const aspect = window.innerWidth / window.innerHeight;
+    return aspect >= 1.2 ? {colsBy:'rank'} : {colsBy:'suit'};
   }
 
   function save(){ localStorage.setItem(stateKey, JSON.stringify([...removed])); }
   function updateCounts(){ const dead = removed.size; const live = 52 - dead; document.getElementById('count-live').textContent = String(live); document.getElementById('count-dead').textContent = String(dead); }
 
   function layout(){
-    // Compute available size
-    const vw = window.innerWidth; const vh = window.innerHeight; const headerH = header.getBoundingClientRect().height;
-    const availH = Math.max(200, vh - headerH - 8);
+    const vw = window.innerWidth; const vh = window.innerHeight; const headerH = header.getBoundingClientRect().height; const availH = Math.max(200, vh - headerH - 8);
     gridWrap.style.height = availH + 'px';
+    const {aliveSuits, aliveRanks} = aliveSets();
 
-    let colsTarget, rowsTarget;
-    if(mode === 'wide'){ colsTarget = 13; rowsTarget = 4; }
-    else if(mode === 'narrow'){ colsTarget = 4; rowsTarget = Math.ceil(52/4); }
-    else { // auto
-      const aspect = vw / vh;
-      if(aspect >= 1.2){ colsTarget = 13; rowsTarget = 4; } else { colsTarget = 4; rowsTarget = Math.ceil(52/4); }
-    }
+    const cfg = currentConfig();
+    const colsTarget = cfg.colsBy==='rank' ? Math.max(1, aliveRanks.length) : Math.max(1, aliveSuits.length);
+    const rowsTarget = cfg.colsBy==='rank' ? Math.max(1, aliveSuits.length) : Math.max(1, aliveRanks.length);
 
-    // gaps
-    const gap = 8; // px (approx .5rem)
-    const paddingX = 16; // grid padding left+right
-
-    // width-driven size
+    const gap = 8; const paddingX = 16;
     const cardW_fromW = Math.floor((vw - paddingX - gap*(colsTarget-1)) / colsTarget);
-    // height-driven size using 63/88 ratio
     const cardH_fromH = Math.floor((availH - gap*(rowsTarget-1)) / rowsTarget);
     const cardW_fromH = Math.floor(cardH_fromH * 63 / 88);
-
-    const cardW = Math.max(30, Math.min(cardW_fromW, cardW_fromH));
+    const cardW = Math.max(36, Math.min(cardW_fromW, cardW_fromH));
     const cardH = Math.floor(cardW * 88 / 63);
 
     grid.style.gridTemplateColumns = `repeat(${colsTarget}, ${cardW}px)`;
     grid.style.gridAutoRows = `${cardH}px`;
-
     document.getElementById('layout-info').textContent = `${colsTarget}×${rowsTarget} ~ ${cardW}×${cardH}px`;
   }
 
   document.getElementById('reset').onclick = ()=>{ removed = new Set(); save(); updateCounts(); render(); layout(); };
-  document.getElementById('inverti').onclick = ()=>{ const newSet = new Set(); for(const c of deck){ if(!removed.has(c.id)) newSet.add(c.id); } removed = newSet; save(); updateCounts(); render(); layout(); };
+  document.getElementById('inverti').onclick = ()=>{ const newSet = new Set(); for(const c of allDeck){ if(!removed.has(c.id)) newSet.add(c.id); } removed = newSet; save(); updateCounts(); render(); layout(); };
   document.getElementById('soloVive').onclick = ()=>{ document.querySelectorAll('.card').forEach(el=>{ el.style.display = el.classList.contains('removed') ? 'none' : ''; }); };
   document.getElementById('soloMorte').onclick = ()=>{ document.querySelectorAll('.card').forEach(el=>{ el.style.display = !el.classList.contains('removed') ? 'none' : ''; }); };
   document.getElementById('tutte').onclick = ()=>{ document.querySelectorAll('.card').forEach(el=>{ el.style.display=''; }); };
-  document.getElementById('toggleMode').onclick = ()=>{
-    mode = mode==='auto' ? 'wide' : mode==='wide' ? 'narrow' : 'auto';
-    document.getElementById('toggleMode').textContent = mode.toUpperCase(); layout();
-  };
+  document.getElementById('mode13x4').onclick = ()=>{ mode='13x4'; render(); layout(); };
+  document.getElementById('mode4x13').onclick = ()=>{ mode='4x13'; render(); layout(); };
+  document.getElementById('modeAuto').onclick = ()=>{ mode='auto'; render(); layout(); };
 
-  render(); updateCounts(); layout();
-  window.addEventListener('resize', layout);
+  render(); updateCounts(); layout(); window.addEventListener('resize', layout);
 
   if('serviceWorker' in navigator){ window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js'); }); }
   </script>
