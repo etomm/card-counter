@@ -16,16 +16,17 @@
     .toolbar{display:flex;gap:.5rem;flex-wrap:wrap}
     button{background:#132; color:var(--fg); border:1px solid #264; padding:.45rem .7rem; border-radius:.5rem; cursor:pointer}
     button.primary{background:var(--accent);border-color:#0a4;color:#021}
-    #grid{padding:.5rem; display:grid; gap:.5rem; align-items:stretch; justify-items:stretch}
+    #grid{padding:.5rem; display:grid; gap:.5rem; align-items:stretch; justify-items:stretch; justify-content:start}
     .cell{width:100%; height:100%;}
     .card{width:100%; height:100%; border-radius:.4rem; border:1px solid #2a2f2a; display:flex; align-items:center; justify-content:center; background:#0e1510; position:relative; overflow:hidden; cursor:pointer; transition:transform .05s}
     .card:active{transform:scale(.98)}
-    .card img{width:100%; height:100%; object-fit:contain; padding:4px; display:block; opacity:.98; filter:drop-shadow(0 0 .2rem #000a)}
+    .card img{width:100%; height:100%; object-fit:contain; padding:6px; display:block; opacity:.98; filter:drop-shadow(0 0 .2rem #000a)}
     .card.removed{opacity:.22; filter:grayscale(.9) brightness(.7)}
+    .placeholder{width:100%; height:100%; border-radius:.4rem; border:1px dashed #263; background:transparent; pointer-events:none; opacity:.18}
     .badge{position:absolute; inset:auto .35rem .35rem auto; background:#0009; color:#fff; font-size:.75rem; padding:.12rem .36rem; border-radius:.35rem}
     .legend{display:flex;gap:1rem; padding:.2rem .75rem; color:var(--muted); font-size:.95rem}
     .status{padding:.4rem .75rem; color:var(--muted)}
-    .grid-wrap{max-width:1600px; margin:0 auto; height:calc(100vh - 120px)}
+    .grid-wrap{width:100vw; max-width:none; margin:0; height:calc(100vh - 120px)}
   </style>
 </head>
 <body>
@@ -66,13 +67,13 @@
     const c = inkColor(s);
     const tl = `
       <g fill='${c}' font-family='-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif' font-weight='700'>
-        <text x='48' y='110' font-size='88'>${rank}</text>
-        <text x='48' y='185' font-size='88'>${suitGlyph(s)}</text>
+        <text x='54' y='116' font-size='82'>${rank}</text>
+        <text x='54' y='186' font-size='82'>${suitGlyph(s)}</text>
       </g>`;
     const br = `
-      <g fill='${c}' font-family='-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif' font-weight='700' transform='rotate(180 580 760)'>
-        <text x='580' y='760' font-size='88' text-anchor='end'>${rank}</text>
-        <text x='580' y='695' font-size='88' text-anchor='end'>${suitGlyph(s)}</text>
+      <g fill='${c}' font-family='-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif' font-weight='700' transform='rotate(180 560 740)'>
+        <text x='560' y='740' font-size='82' text-anchor='end'>${rank}</text>
+        <text x='560' y='680' font-size='82' text-anchor='end'>${suitGlyph(s)}</text>
       </g>`;
     return tl + br;
   }
@@ -81,8 +82,10 @@
     const c = inkColor(suit);
     const X = {L:150, CL:240, C:315, CR:390, R:480};
     const Y = {T:160, UT:270, M:440, DB:610, B:720};
+
     let content = `<g fill='${c}' font-family='-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif' font-weight='700'>`;
     const num = (rank==='A')?1 : (rank==='K'||rank==='Q'||rank==='J'?null : (rank==='10'?10:parseInt(rank)));
+
     if(rank==='A'){
       content += pip(315, 440, suit, 234, false);
     } else if(num){
@@ -103,6 +106,7 @@
       content += `<text x='315' y='420' font-size='260' text-anchor='middle' dominant-baseline='middle' opacity='0.95'>${rank}</text>`;
       content += `<text x='315' y='620' font-size='160' text-anchor='middle' dominant-baseline='middle' opacity='0.9'>${glyph}</text>`;
     }
+
     content += '</g>';
     return content;
   }
@@ -120,61 +124,76 @@
   const grid = document.getElementById('grid');
   const gridWrap = document.getElementById('gridWrap');
   const header = document.querySelector('header');
-  const stateKey = 'holdem-card-state-v6';
+  const stateKey = 'holdem-card-state-v7';
   let removed = new Set(JSON.parse(localStorage.getItem(stateKey) || '[]'));
   let mode = 'auto'; // 'auto' | '13x4' | '4x13'
-  let filterMode = 'live'; // 'all' | 'live' | 'dead' ; default to live as per current behavior
+  let filterMode = 'live'; // 'all' | 'live' | 'dead'
 
-  function cardMatchesFilter(id){
-    const isDead = removed.has(id);
-    if(filterMode==='all') return true;
-    if(filterMode==='live') return !isDead;
-    if(filterMode==='dead') return isDead;
+  function cardMatchesFilter(id){ const isDead = removed.has(id); if(filterMode==='all') return true; if(filterMode==='live') return !isDead; if(filterMode==='dead') return isDead; }
+
+  function countsByAxes(){
+    // Count cards per suit and per rank that match current filter
+    const countsSuit = {S:0,H:0,D:0,C:0};
+    const countsRank = {A:0,K:0,Q:0,J:0,10:0,9:0,8:0,7:0,6:0,5:0,4:0,3:0,2:0};
+    for(const c of allDeck){ if(cardMatchesFilter(c.id)){ countsSuit[c.s]++; countsRank[c.r]++; } }
+    return {countsSuit, countsRank};
   }
 
-  function presentSets(){
-    // Sets with at least one card matching filter
-    const present = allDeck.filter(c=> cardMatchesFilter(c.id));
-    const suitsSet = new Set(present.map(c=> c.s));
-    const ranksSet = new Set(present.map(c=> c.r));
-    return {suits:[...suitsSet], ranks:[...ranksSet]};
+  function axes(){
+    const {countsSuit, countsRank} = countsByAxes();
+    // Full axes for 'all'; for filtered modes, drop only rows/cols with zero matching cards
+    const suitsAxis = (filterMode==='all' ? suits : suits.filter(s=> countsSuit[s]>0));
+    const ranksAxis = (filterMode==='all' ? ranks : ranks.filter(r=> countsRank[r]>0));
+    return {suitsAxis, ranksAxis};
   }
 
   function render(){
     grid.innerHTML = '';
-    const {suits, ranks} = presentSets();
-
-    let suitsAxis = ['S','H','D','C'].filter(s=> suits.includes(s));
-    let ranksAxis = ['A','K','Q','J','10','9','8','7','6','5','4','3','2'].filter(r=> ranks.includes(r));
-
-    const list = [];
+    const {suitsAxis, ranksAxis} = axes();
     const colsByRank = currentConfig().colsBy === 'rank';
+
     if(colsByRank){
-      // 13x4 style: rows=suits, cols=ranks
-      for(const s of suitsAxis){ for(const r of ranksAxis){ const id = r + s; if(cardMatchesFilter(id)) list.push({r,s}); } }
+      // 13×4 style: rows = suitsAxis; cols = ranksAxis; preserve positions with placeholders
+      for(const s of suitsAxis){
+        for(const r of ranksAxis){
+          const id = r + s;
+          const wrapper = document.createElement('div'); wrapper.className = 'cell';
+          if(cardMatchesFilter(id)){
+            const el = document.createElement('button'); el.className = 'card'; el.type = 'button';
+            const img = document.createElement('img'); img.alt = `${r} di ${suitNames[s]}`; img.loading = 'lazy'; img.decoding = 'async'; img.src = cardSVG(r, s); el.appendChild(img);
+            if(removed.has(id)) el.classList.add('removed');
+            const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = removed.has(id) ? 'morta' : 'viva'; el.appendChild(badge);
+            el.addEventListener('click', ()=>{ if(removed.has(id)) removed.delete(id); else removed.add(id); save(); updateCounts(); render(); layout(); });
+            wrapper.appendChild(el);
+          } else {
+            const ph = document.createElement('div'); ph.className = 'placeholder'; wrapper.appendChild(ph);
+          }
+          grid.appendChild(wrapper);
+        }
+      }
     } else {
-      // 4x13 style: rows=ranks, cols=suits
-      for(const r of ranksAxis){ for(const s of suitsAxis){ const id = r + s; if(cardMatchesFilter(id)) list.push({r,s}); } }
-    }
-
-    for(const cs of list){
-      const id = cs.r + cs.s;
-      const wrapper = document.createElement('div'); wrapper.className = 'cell';
-      const el = document.createElement('button'); el.className = 'card'; el.type = 'button';
-      const img = document.createElement('img'); img.alt = `${cs.r} di ${suitNames[cs.s]}`; img.loading = 'lazy'; img.decoding = 'async'; img.src = cardSVG(cs.r, cs.s); el.appendChild(img);
-      if(removed.has(id)) el.classList.add('removed');
-      const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = removed.has(id) ? 'morta' : 'viva'; el.appendChild(badge);
-      el.addEventListener('click', ()=>{ if(removed.has(id)) removed.delete(id); else removed.add(id); save(); updateCounts(); render(); layout(); });
-      wrapper.appendChild(el); grid.appendChild(wrapper);
+      // 4×13 style: rows = ranksAxis; cols = suitsAxis
+      for(const r of ranksAxis){
+        for(const s of suitsAxis){
+          const id = r + s;
+          const wrapper = document.createElement('div'); wrapper.className = 'cell';
+          if(cardMatchesFilter(id)){
+            const el = document.createElement('button'); el.className = 'card'; el.type = 'button';
+            const img = document.createElement('img'); img.alt = `${r} di ${suitNames[s]}`; img.loading = 'lazy'; img.decoding = 'async'; img.src = cardSVG(r, s); el.appendChild(img);
+            if(removed.has(id)) el.classList.add('removed');
+            const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = removed.has(id) ? 'morta' : 'viva'; el.appendChild(badge);
+            el.addEventListener('click', ()=>{ if(removed.has(id)) removed.delete(id); else removed.add(id); save(); updateCounts(); render(); layout(); });
+            wrapper.appendChild(el);
+          } else {
+            const ph = document.createElement('div'); ph.className = 'placeholder'; wrapper.appendChild(ph);
+          }
+          grid.appendChild(wrapper);
+        }
+      }
     }
   }
 
-  function currentConfig(){
-    if(mode === '13x4') return {colsBy:'rank'};
-    if(mode === '4x13') return {colsBy:'suit'};
-    const aspect = window.innerWidth / window.innerHeight;
-    return aspect >= 1.2 ? {colsBy:'rank'} : {colsBy:'suit'};
-  }
+  function currentConfig(){ if(mode === '13x4') return {colsBy:'rank'}; if(mode === '4x13') return {colsBy:'suit'}; const aspect = window.innerWidth / window.innerHeight; return aspect >= 1.2 ? {colsBy:'rank'} : {colsBy:'suit'}; }
 
   function save(){ localStorage.setItem(stateKey, JSON.stringify([...removed])); }
   function updateCounts(){ const dead = removed.size; const live = 52 - dead; document.getElementById('count-live').textContent = String(live); document.getElementById('count-dead').textContent = String(dead); }
@@ -183,23 +202,23 @@
     const vw = window.innerWidth; const vh = window.innerHeight; const headerH = header.getBoundingClientRect().height; const availH = Math.max(200, vh - headerH - 8);
     gridWrap.style.height = availH + 'px';
 
-    const {suits, ranks} = presentSets();
+    const {suitsAxis, ranksAxis} = axes();
     const cfg = currentConfig();
-    let colsTarget = cfg.colsBy==='rank' ? Math.max(1, ranks.length) : Math.max(1, suits.length);
-    let rowsTarget = cfg.colsBy==='rank' ? Math.max(1, suits.length) : Math.max(1, ranks.length);
+    const colsTarget = cfg.colsBy==='rank' ? Math.max(1, ranksAxis.length) : Math.max(1, suitsAxis.length);
+    const rowsTarget = cfg.colsBy==='rank' ? Math.max(1, suitsAxis.length) : Math.max(1, ranksAxis.length);
 
-    const gap = 8; const paddingX = 16;
+    const gap = 8; const paddingX = 16; // account for #grid padding
     const cardW_fromW = Math.floor((vw - paddingX - gap*(colsTarget-1)) / colsTarget);
     const cardH_fromH = Math.floor((availH - gap*(rowsTarget-1)) / rowsTarget);
     const cardW_fromH = Math.floor(cardH_fromH * 63 / 88);
 
     let cardW;
     if(cfg.colsBy==='suit'){
-      // Narrow mode: prioritize width to fill horizontally; allow vertical scroll if needed
-      cardW = Math.max(36, cardW_fromW);
+      // Narrow: ensure full horizontal fill
+      cardW = Math.max(48, cardW_fromW);
     } else {
-      // Wide mode: maximize without overflow using min(width,height-driven)
-      cardW = Math.max(36, min(cardW_fromW, cardW_fromH));
+      // Wide: fit both dimensions
+      cardW = Math.max(48, Math.min(cardW_fromW, cardW_fromH));
     }
     const cardH = Math.floor(cardW * 88 / 63);
 
@@ -207,8 +226,6 @@
     grid.style.gridAutoRows = `${cardH}px`;
     document.getElementById('layout-info').textContent = `${colsTarget}×${rowsTarget} ~ ${cardW}×${cardH}px (${cfg.colsBy==='rank'?'13×4-style':'4×13-style'}) [filter:${filterMode}]`;
   }
-
-  function min(a,b){ return a<b?a:b; }
 
   // Buttons
   document.getElementById('reset').onclick = ()=>{ removed = new Set(); save(); updateCounts(); render(); layout(); };
