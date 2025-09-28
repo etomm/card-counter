@@ -16,16 +16,15 @@
     .toolbar{display:flex;gap:.5rem;flex-wrap:wrap}
     button{background:#132; color:var(--fg); border:1px solid #264; padding:.45rem .7rem; border-radius:.5rem; cursor:pointer}
     button.primary{background:var(--accent);border-color:#0a4;color:#021}
-    #grid{padding:.75rem; display:grid; grid-template-columns:repeat(4, minmax(70px, 1fr)); gap:.5rem; align-items:center; justify-items:center}
-    .card{width:100%; aspect-ratio:63/88; border-radius:.4rem; border:1px solid #2a2f2a; display:flex; align-items:center; justify-content:center; background:#0e1510; position:relative; overflow:hidden; cursor:pointer; transition:transform .05s}
+    #grid{padding:.5rem; display:grid; gap:.5rem; align-items:stretch; justify-items:stretch}
+    .card{width:100%; height:100%; border-radius:.4rem; border:1px solid #2a2f2a; display:flex; align-items:center; justify-content:center; background:#0e1510; position:relative; overflow:hidden; cursor:pointer; transition:transform .05s}
     .card:active{transform:scale(.98)}
     .card img{width:100%; height:100%; object-fit:contain; padding:4px; display:block; opacity:.98; filter:drop-shadow(0 0 .2rem #000a)}
     .card.removed{opacity:.22; filter:grayscale(.9) brightness(.7)}
     .badge{position:absolute; inset:auto .35rem .35rem auto; background:#0009; color:#fff; font-size:.75rem; padding:.12rem .36rem; border-radius:.35rem}
     .legend{display:flex;gap:1rem; padding:.2rem .75rem; color:var(--muted); font-size:.95rem}
     .status{padding:.4rem .75rem; color:var(--muted)}
-    .grid-wrap{max-width:920px; margin:0 auto}
-    @media (width >= 900px){ #grid{ grid-template-columns:repeat(4, minmax(110px, 1fr)); } }
+    .grid-wrap{max-width:1400px; margin:0 auto; height:calc(100vh - 120px)} /* height adjusted at runtime */
   </style>
 </head>
 <body>
@@ -37,15 +36,16 @@
       <button id="soloVive">Mostra solo vive</button>
       <button id="soloMorte">Mostra solo morte</button>
       <button id="tutte">Mostra tutte</button>
-      <button id="toggleLayout">Layout compatto 13×4</button>
+      <button id="toggleMode">Auto</button>
     </div>
     <div class="legend"> 
       <span>Vive: <strong id="count-live">52</strong></span>
       <span>Morte: <strong id="count-dead">0</strong></span>
+      <span id="layout-info"></span>
     </div>
   </header>
-  <div class="grid-wrap">
-    <div id="grid" aria-label="Mazzo di 52 carte (righe per rango, 4 colonne per semi)"></div>
+  <div class="grid-wrap" id="gridWrap">
+    <div id="grid" aria-label="Mazzo responsive"></div>
     <div class="status" id="status"></div>
   </div>
   <script>
@@ -57,15 +57,8 @@
   function isRed(s){ return (s==='H'||s==='D'); }
   function inkColor(s){ return isRed(s) ? '#e44747' : '#eaf3ea'; }
 
-  function pip(x, y, s, fontSize, rotate){
-    const glyph = suitGlyph(s);
-    const rot = rotate ? ` transform='rotate(180 ${x} ${y})'` : '';
-    return `<text x='${x}' y='${y}' font-size='${fontSize}' text-anchor='middle' dominant-baseline='middle'${rot}>${glyph}</text>`;
-  }
-
-  function cornerIndex(rank, s){
-    const c = inkColor(s);
-    return `
+  function pip(x, y, s, fontSize, rotate){ const glyph = suitGlyph(s); const rot = rotate ? ` transform='rotate(180 ${x} ${y})'` : ''; return `<text x='${x}' y='${y}' font-size='${fontSize}' text-anchor='middle' dominant-baseline='middle'${rot}>${glyph}</text>`; }
+  function cornerIndex(rank, s){ const c = inkColor(s); return `
       <g fill='${c}' font-family='-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif' font-weight='700'>
         <text x='48' y='120' font-size='92'>${rank}</text>
         <text x='48' y='190' font-size='92'>${suitGlyph(s)}</text>
@@ -73,74 +66,48 @@
           <text x='582' y='820' font-size='92' text-anchor='end'>${rank}</text>
           <text x='582' y='750' font-size='92' text-anchor='end'>${suitGlyph(s)}</text>
         </g>
-      </g>`;
-  }
-
+      </g>`; }
   function pipsForRank(rank, suit){
-    const c = inkColor(suit);
-    const X = {L:150, CL:240, C:315, CR:390, R:480};
-    const Y = {T:160, UT:270, M:440, DB:610, B:720};
-
+    const c = inkColor(suit); const X = {L:150, CL:240, C:315, CR:390, R:480}; const Y = {T:160, UT:270, M:440, DB:610, B:720};
     let content = `<g fill='${c}' font-family='-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif' font-weight='700'>`;
     const num = (rank==='A')?1 : (rank==='K'||rank==='Q'||rank==='J'?null : (rank==='10'?10:parseInt(rank)));
-
-    if(rank==='A'){
-      content += pip(315, 440, suit, 260, false);
-    } else if(num){
-      const fs = 120;
-      switch(num){
-        case 2: content += pip(X.C, Y.T, suit, fs, false) + pip(X.C, Y.B, suit, fs, true); break;
-        case 3: content += pip(X.C, Y.T, suit, fs, false) + pip(X.C, Y.M, suit, fs, false) + pip(X.C, Y.B, suit, fs, true); break;
-        case 4: content += pip(X.L, Y.T, suit, fs, false) + pip(X.R, Y.T, suit, fs, false) + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true); break;
-        case 5: content += pip(X.L, Y.T, suit, fs, false) + pip(X.R, Y.T, suit, fs, false) + pip(X.C, Y.M, suit, fs, false) + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true); break;
-        case 6: content += pip(X.L, Y.T, suit, fs, false) + pip(X.R, Y.T, suit, fs, false) + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false) + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true); break;
-        case 7: content += pip(X.C, Y.T, suit, fs, false) + pip(X.L, Y.UT, suit, fs, false) + pip(X.R, Y.UT, suit, fs, false) + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false) + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true); break;
-        case 8: content += pip(X.C, Y.T, suit, fs, false) + pip(X.L, Y.UT, suit, fs, false) + pip(X.R, Y.UT, suit, fs, false) + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false) + pip(X.L, Y.DB, suit, fs, true) + pip(X.R, Y.DB, suit, fs, true) + pip(X.C, Y.B, suit, fs, true); break;
-        case 9: content += pip(X.C, Y.M, suit, fs, false) + pip(X.C, Y.T, suit, fs, false) + pip(X.C, Y.B, suit, fs, true) + pip(X.L, Y.UT, suit, fs, false) + pip(X.R, Y.UT, suit, fs, false) + pip(X.L, Y.DB, suit, fs, true) + pip(X.R, Y.DB, suit, fs, true) + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false); break;
-        case 10: content += pip(X.L, Y.T, suit, fs, false) + pip(X.R, Y.T, suit, fs, false) + pip(X.L, Y.UT, suit, fs, false) + pip(X.R, Y.UT, suit, fs, false) + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false) + pip(X.L, Y.DB, suit, fs, true) + pip(X.R, Y.DB, suit, fs, true) + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true); break;
-      }
-    } else {
-      const glyph = suitGlyph(suit);
-      content += `<text x='315' y='420' font-size='260' text-anchor='middle' dominant-baseline='middle' opacity='0.95'>${rank}</text>`;
-      content += `<text x='315' y='620' font-size='160' text-anchor='middle' dominant-baseline='middle' opacity='0.9'>${glyph}</text>`;
-    }
-
+    if(rank==='A'){ content += pip(315, 440, suit, 260, false);
+    } else if(num){ const fs = 120; switch(num){
+      case 2: content += pip(X.C, Y.T, suit, fs, false) + pip(X.C, Y.B, suit, fs, true); break;
+      case 3: content += pip(X.C, Y.T, suit, fs, false) + pip(X.C, Y.M, suit, fs, false) + pip(X.C, Y.B, suit, fs, true); break;
+      case 4: content += pip(X.L, Y.T, suit, fs, false) + pip(X.R, Y.T, suit, fs, false) + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true); break;
+      case 5: content += pip(X.L, Y.T, suit, fs, false) + pip(X.R, Y.T, suit, fs, false) + pip(X.C, Y.M, suit, fs, false) + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true); break;
+      case 6: content += pip(X.L, Y.T, suit, fs, false) + pip(X.R, Y.T, suit, fs, false) + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false) + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true); break;
+      case 7: content += pip(X.C, Y.T, suit, fs, false) + pip(X.L, Y.UT, suit, fs, false) + pip(X.R, Y.UT, suit, fs, false) + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false) + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true); break;
+      case 8: content += pip(X.C, Y.T, suit, fs, false) + pip(X.L, Y.UT, suit, fs, false) + pip(X.R, Y.UT, suit, fs, false) + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false) + pip(X.L, Y.DB, suit, fs, true) + pip(X.R, Y.DB, suit, fs, true) + pip(X.C, Y.B, suit, fs, true); break;
+      case 9: content += pip(X.C, Y.M, suit, fs, false) + pip(X.C, Y.T, suit, fs, false) + pip(X.C, Y.B, suit, fs, true) + pip(X.L, Y.UT, suit, fs, false) + pip(X.R, Y.UT, suit, fs, false) + pip(X.L, Y.DB, suit, fs, true) + pip(X.R, Y.DB, suit, fs, true) + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false); break;
+      case 10: content += pip(X.L, Y.T, suit, fs, false) + pip(X.R, Y.T, suit, fs, false) + pip(X.L, Y.UT, suit, fs, false) + pip(X.R, Y.UT, suit, fs, false) + pip(X.L, Y.M, suit, fs, false) + pip(X.R, Y.M, suit, fs, false) + pip(X.L, Y.DB, suit, fs, true) + pip(X.R, Y.DB, suit, fs, true) + pip(X.L, Y.B, suit, fs, true) + pip(X.R, Y.B, suit, fs, true); break; }
+    } else { const glyph = suitGlyph(suit); content += `<text x='315' y='420' font-size='260' text-anchor='middle' dominant-baseline='middle' opacity='0.95'>${rank}</text>`; content += `<text x='315' y='620' font-size='160' text-anchor='middle' dominant-baseline='middle' opacity='0.9'>${glyph}</text>`; }
     content += '</g>'; return content;
   }
 
-  function cardSVG(rank,suit){
-    const bgStroke = isRed(suit)?'#a44':'#2a3';
-    return `data:image/svg+xml;utf8,`+
-      encodeURIComponent(`
-      <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 630 880' preserveAspectRatio='xMidYMid meet'>
-        <defs>
-          <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
-            <stop offset='0' stop-color='#0f1a12'/>
-            <stop offset='1' stop-color='#0a120c'/>
-          </linearGradient>
-        </defs>
-        <rect x='8' y='8' width='614' height='864' rx='36' ry='36' fill='url(#g)' stroke='${bgStroke}' stroke-width='8'/>
-        ${cornerIndex(rank, suit)}
-        ${pipsForRank(rank, suit)}
-      </svg>`);
-  }
+  function cardSVG(rank,suit){ const bgStroke = isRed(suit)?'#a44':'#2a3'; return `data:image/svg+xml;utf8,`+encodeURIComponent(`
+    <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 630 880' preserveAspectRatio='xMidYMid meet'>
+      <defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#0f1a12'/><stop offset='1' stop-color='#0a120c'/></linearGradient></defs>
+      <rect x='8' y='8' width='614' height='864' rx='36' ry='36' fill='url(#g)' stroke='${bgStroke}' stroke-width='8'/>
+      ${cornerIndex(rank, suit)}
+      ${pipsForRank(rank, suit)}
+    </svg>`); }
 
-  const deck = []; // rows by rank, 4 columns by suit
-  for(const r of ranks){ for(const s of suits){ deck.push({id:`${r}${s}`, r, s}); } }
+  const deck = []; for(const r of ranks){ for(const s of suits){ deck.push({id:`${r}${s}`, r, s}); } }
 
   const grid = document.getElementById('grid');
-  const stateKey = 'holdem-card-state-v3';
+  const gridWrap = document.getElementById('gridWrap');
+  const header = document.querySelector('header');
+  const stateKey = 'holdem-card-state-v4';
   let removed = new Set(JSON.parse(localStorage.getItem(stateKey) || '[]'));
-  let compact = false;
+  let mode = 'auto'; // 'auto' | 'wide' | 'narrow'
 
   function render(){
     grid.innerHTML = '';
-    grid.style.gridTemplateColumns = compact ? 'repeat(13, minmax(24px, 1fr))' : 'repeat(4, minmax(70px, 1fr))';
     for(const card of deck){
       const el = document.createElement('button'); el.className = 'card'; el.type = 'button';
-      const img = document.createElement('img');
-      img.alt = `${card.r} di ${suitNames[card.s]}`; img.loading = 'lazy'; img.decoding = 'async';
-      img.src = cardSVG(card.r, card.s); el.appendChild(img);
+      const img = document.createElement('img'); img.alt = `${card.r} di ${suitNames[card.s]}`; img.loading = 'lazy'; img.decoding = 'async'; img.src = cardSVG(card.r, card.s); el.appendChild(img);
       if(removed.has(card.id)) el.classList.add('removed');
       const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = removed.has(card.id) ? 'morta' : 'viva'; el.appendChild(badge);
       el.addEventListener('click', ()=>{ if(removed.has(card.id)) removed.delete(card.id); else removed.add(card.id); save(); updateCounts(); el.classList.toggle('removed'); badge.textContent = removed.has(card.id) ? 'morta' : 'viva'; });
@@ -151,14 +118,51 @@
   function save(){ localStorage.setItem(stateKey, JSON.stringify([...removed])); }
   function updateCounts(){ const dead = removed.size; const live = 52 - dead; document.getElementById('count-live').textContent = String(live); document.getElementById('count-dead').textContent = String(dead); }
 
-  document.getElementById('reset').onclick = ()=>{ removed = new Set(); save(); updateCounts(); render(); };
-  document.getElementById('inverti').onclick = ()=>{ const newSet = new Set(); for(const c of deck){ if(!removed.has(c.id)) newSet.add(c.id); } removed = newSet; save(); updateCounts(); render(); };
+  function layout(){
+    // Compute available size
+    const vw = window.innerWidth; const vh = window.innerHeight; const headerH = header.getBoundingClientRect().height;
+    const availH = Math.max(200, vh - headerH - 8);
+    gridWrap.style.height = availH + 'px';
+
+    let colsTarget, rowsTarget;
+    if(mode === 'wide'){ colsTarget = 13; rowsTarget = 4; }
+    else if(mode === 'narrow'){ colsTarget = 4; rowsTarget = Math.ceil(52/4); }
+    else { // auto
+      const aspect = vw / vh;
+      if(aspect >= 1.2){ colsTarget = 13; rowsTarget = 4; } else { colsTarget = 4; rowsTarget = Math.ceil(52/4); }
+    }
+
+    // gaps
+    const gap = 8; // px (approx .5rem)
+    const paddingX = 16; // grid padding left+right
+
+    // width-driven size
+    const cardW_fromW = Math.floor((vw - paddingX - gap*(colsTarget-1)) / colsTarget);
+    // height-driven size using 63/88 ratio
+    const cardH_fromH = Math.floor((availH - gap*(rowsTarget-1)) / rowsTarget);
+    const cardW_fromH = Math.floor(cardH_fromH * 63 / 88);
+
+    const cardW = Math.max(30, Math.min(cardW_fromW, cardW_fromH));
+    const cardH = Math.floor(cardW * 88 / 63);
+
+    grid.style.gridTemplateColumns = `repeat(${colsTarget}, ${cardW}px)`;
+    grid.style.gridAutoRows = `${cardH}px`;
+
+    document.getElementById('layout-info').textContent = `${colsTarget}×${rowsTarget} ~ ${cardW}×${cardH}px`;
+  }
+
+  document.getElementById('reset').onclick = ()=>{ removed = new Set(); save(); updateCounts(); render(); layout(); };
+  document.getElementById('inverti').onclick = ()=>{ const newSet = new Set(); for(const c of deck){ if(!removed.has(c.id)) newSet.add(c.id); } removed = newSet; save(); updateCounts(); render(); layout(); };
   document.getElementById('soloVive').onclick = ()=>{ document.querySelectorAll('.card').forEach(el=>{ el.style.display = el.classList.contains('removed') ? 'none' : ''; }); };
   document.getElementById('soloMorte').onclick = ()=>{ document.querySelectorAll('.card').forEach(el=>{ el.style.display = !el.classList.contains('removed') ? 'none' : ''; }); };
   document.getElementById('tutte').onclick = ()=>{ document.querySelectorAll('.card').forEach(el=>{ el.style.display=''; }); };
-  document.getElementById('toggleLayout').onclick = ()=>{ compact = !compact; document.getElementById('toggleLayout').textContent = compact? 'Layout grande 4×13' : 'Layout compatto 13×4'; render(); };
+  document.getElementById('toggleMode').onclick = ()=>{
+    mode = mode==='auto' ? 'wide' : mode==='wide' ? 'narrow' : 'auto';
+    document.getElementById('toggleMode').textContent = mode.toUpperCase(); layout();
+  };
 
-  render(); updateCounts();
+  render(); updateCounts(); layout();
+  window.addEventListener('resize', layout);
 
   if('serviceWorker' in navigator){ window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js'); }); }
   </script>
