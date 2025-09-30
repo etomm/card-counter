@@ -21,7 +21,7 @@
     .cell{width:100%; height:100%;}
     .card{width:100%; height:100%; border-radius:.4rem; border:1px solid #2a2f2a; display:flex; align-items:center; justify-content:center; background:#0e1510; position:relative; overflow:hidden; cursor:pointer; transition:transform .05s}
     .card:active{transform:scale(.98)}
-    .card img{width:100%; height:100%; object-fit:contain; padding:10px; display:block; opacity:.98; filter:drop-shadow(0 0 .2rem #000a)}
+    .card img{width:100%; height:100%; object-fit:contain; padding:4px; display:block; opacity:.98; filter:drop-shadow(0 0 .2rem #000a)}
     .card.removed{opacity:.22; filter:grayscale(.9) brightness(.7)}
     .placeholder{width:100%; height:100%; border-radius:.4rem; border:1px dashed #263; background:transparent; pointer-events:none; opacity:.18}
     .badge{position:absolute; inset:auto .35rem .35rem auto; background:#0009; color:#fff; font-size:.75rem; padding:.12rem .36rem; border-radius:.35rem}
@@ -41,7 +41,7 @@
         <option value="french40">Francese 40 (A,2–7,J,Q,K)</option>
         <option value="piquet32">Piquet/Skat 32 (7–A)</option>
         <option value="euchre24">Euchre 24 (9–A)</option>
-        <option value="napo40">Napoletane 40 (bastoni, coppe, denari, spade)</option>
+        <option value="naposvg">Napoletane 40 (SVG)</option>
       </select>
       <button id="saveDeck">Salva</button>
     </div>
@@ -88,10 +88,10 @@
       suits:[{id:'S',name:'picche'},{id:'H',name:'cuori'},{id:'D',name:'quadri'},{id:'C',name:'fiori'}],
       ranks:['A','K','Q','J','10','9']
     },
-    napo40: {
-      id:'napo40', name:'Napoletane 40', type:'latin',
-      suits:[{id:'B',name:'bastoni'},{id:'C',name:'coppe'},{id:'D',name:'denari'},{id:'S',name:'spade'}],
-      ranks:['A','2','3','4','5','6','7','F','C','R'] // F=fante, C=cavallo, R=re
+    naposvg: {
+      id:'naposvg', name:'Napoletane 40', type:'napo_svg',
+      suits:[{id:'bastoni',name:'bastoni'},{id:'coppe',name:'coppe'},{id:'denari',name:'denari'},{id:'spade',name:'spade'}],
+      ranks:['A','2','3','4','5','6','7','F','C','R']
     }
   };
 
@@ -117,37 +117,7 @@
   function isRedFrench(s){ return (s==='H'||s==='D'); }
   function inkFrench(s){ return isRedFrench(s) ? '#e44747' : '#eaf3ea'; }
 
-  // Latin suit drawing helpers
-  function latinShape(s, cx, cy, size, fill){
-    // return SVG path elements strings for latin suits
-    if(s==='D'){ // denari: circle
-      return `<circle cx='${cx}' cy='${cy}' r='${size*0.5}' fill='${fill}' />`;
-    }
-    if(s==='C'){ // coppe: cup
-      const w = size, h = size*0.7;
-      return `
-        <path d='M ${cx-w*0.45} ${cy} Q ${cx} ${cy-h} ${cx+w*0.45} ${cy} Z' fill='${fill}' />
-        <rect x='${cx-w*0.12}' y='${cy}' width='${w*0.24}' height='${h*0.35}' rx='${w*0.06}' fill='${fill}' />
-        <rect x='${cx-w*0.35}' y='${cy+h*0.35}' width='${w*0.7}' height='${h*0.12}' rx='${w*0.06}' fill='${fill}' />`;
-    }
-    if(s==='S'){ // spade (swords): stylized sword
-      const w=size*0.18, h=size*0.9;
-      return `
-        <rect x='${cx-w/2}' y='${cy-h/2}' width='${w}' height='${h}' rx='${w*0.3}' fill='${fill}' />
-        <polygon points='${cx-w} ${cy-h*0.45}, ${cx} ${cy-h*0.62}, ${cx+w} ${cy-h*0.45}' fill='${fill}' />
-        <rect x='${cx-w*1.8}' y='${cy+h*0.3}' width='${w*3.6}' height='${w*0.6}' rx='${w*0.3}' fill='${fill}' />`;
-    }
-    if(s==='B'){ // bastoni: club stick
-      const w=size*0.22, h=size*0.85;
-      return `
-        <rect x='${cx-w/2}' y='${cy-h/2}' width='${w}' height='${h}' rx='${w*0.5}' fill='${fill}' />
-        <circle cx='${cx}' cy='${cy-h*0.45}' r='${w*0.85}' fill='${fill}' />`;
-    }
-    return '';
-  }
-
   function cornerIndex(rank, s){
-    // Determine deck type and draw accordingly
     if(activeDeck.type==='french'){
       const c = inkFrench(s);
       const sg = suitGlyphFrench(s);
@@ -160,23 +130,11 @@
             <text x='54' y='186' font-size='82'>${sg}</text>
           </g>
         </g>`;
-    } else {
-      // latin: draw rank text and small shape
-      const fill = '#eaf3ea';
-      return `
-        <g fill='${fill}' font-family='-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif' font-weight='700'>
-          <text x='54' y='116' font-size='82'>${rank}</text>
-          <g>${latinShape(s, 54, 186, 60, fill)}</g>
-          <g transform='rotate(180 315 440)'>
-            <text x='54' y='116' font-size='82'>${rank}</text>
-            <g>${latinShape(s, 54, 186, 60, fill)}</g>
-          </g>
-        </g>`;
     }
+    return ''; // For napo_svg, use the actual SVG image
   }
 
   function pipsFrench(rank, suit){
-    // Smaller pip size per latest feedback
     const c = inkFrench(suit);
     const X = {L:150, CL:240, C:315, CR:390, R:480};
     const Y = {T:160, UT:270, M:440, DB:610, B:720};
@@ -207,30 +165,35 @@
     return content;
   }
 
-  function centerLatin(suit){
-    const fill = '#eaf3ea';
-    return `<g>${latinShape(suit, 315, 440, 260, fill)}</g>`;
-  }
-
-  function cardSVG(rank, suit){
-    const stroke = (activeDeck.type==='french' && isRedFrench(suit)) ? '#a44' : '#2a3';
-    const center = (activeDeck.type==='french') ? pipsFrench(rank, suit) : centerLatin(suit);
+  function cardSVG(rank, suitId){
+    const stroke = (activeDeck.type==='french' && isRedFrench(suitId)) ? '#a44' : '#2a3';
+    const center = pipsFrench(rank, suitId);
     return `data:image/svg+xml;utf8,`+encodeURIComponent(`
       <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 630 880' preserveAspectRatio='xMidYMid meet'>
         <defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#0f1a12'/><stop offset='1' stop-color='#0a120c'/></linearGradient></defs>
         <rect x='8' y='8' width='614' height='864' rx='36' ry='36' fill='url(#g)' stroke='${stroke}' stroke-width='8'/>
-        ${cornerIndex(rank, suit)}
+        ${cornerIndex(rank, suitId)}
         ${center}
       </svg>`);
   }
 
-  function deckList(){
-    const list = [];
-    for(const r of activeDeck.ranks){ for(const s of activeDeck.suits){ list.push({r,s}); } }
-    return list;
+  // Mapping from card rank/suit to SVG number (1-40)
+  function cardToSvgNumber(rank, suitId){
+    const suits = ['bastoni', 'coppe', 'denari', 'spade'];
+    const ranks = ['A','2','3','4','5','6','7','F','C','R'];
+    const suitIndex = suits.indexOf(suitId);
+    const rankIndex = ranks.indexOf(rank);
+    if(suitIndex === -1 || rankIndex === -1) return 1;
+    return suitIndex * 10 + rankIndex + 1;
   }
 
-  function cardId(obj){ return obj.r + obj.s.id; }
+  function imgSrc(rank, suitId){
+    if(activeDeck.type === 'napo_svg'){
+      const svgNum = cardToSvgNumber(rank, suitId);
+      return `napoletane_svg/${svgNum}.svg`;
+    }
+    return null; // French cards use procedural SVG
+  }
 
   function cardMatchesFilter(id){ const isDead = removed.has(id); if(filterMode==='all') return true; if(filterMode==='live') return !isDead; if(filterMode==='dead') return isDead; }
 
@@ -238,7 +201,7 @@
     const countsSuit = {}; const countsRank={};
     for(const s of activeDeck.suits){ countsSuit[s.id]=0; }
     for(const r of activeDeck.ranks){ countsRank[r]=0; }
-    for(const r of activeDeck.ranks){ for(const s of activeDeck.suits){ const id = r + s.id; if(cardMatchesFilter(id)) { countsSuit[s.id]++; countsRank[r]++; } } }
+    for(const r of activeDeck.ranks){ for(const s of activeDeck.suits){ const id = r + '_' + s.id; if(cardMatchesFilter(id)) { countsSuit[s.id]++; countsRank[r]++; } } }
     return {countsSuit, countsRank};
   }
 
@@ -255,9 +218,9 @@
     const colsByRank = currentConfig().colsBy === 'rank';
 
     if(colsByRank){
-      for(const s of suitsAxis){ for(const r of ranksAxis){ const id = r + s.id; const wrapper = document.createElement('div'); wrapper.className = 'cell'; if(cardMatchesFilter(id)){ const el = document.createElement('button'); el.className = 'card'; el.type='button'; const img = document.createElement('img'); img.alt = `${r} di ${s.name}`; img.loading='lazy'; img.decoding='async'; img.src = cardSVG(r, s.id); el.appendChild(img); if(removed.has(id)) el.classList.add('removed'); const badge=document.createElement('span'); badge.className='badge'; badge.textContent = removed.has(id)?'morta':'viva'; el.appendChild(badge); el.addEventListener('click', ()=>{ if(removed.has(id)) removed.delete(id); else removed.add(id); save(); updateCounts(); render(); layout(); }); wrapper.appendChild(el);} else { const ph=document.createElement('div'); ph.className='placeholder'; wrapper.appendChild(ph);} grid.appendChild(wrapper);} }
+      for(const s of suitsAxis){ for(const r of ranksAxis){ const id = r + '_' + s.id; const wrapper = document.createElement('div'); wrapper.className = 'cell'; if(cardMatchesFilter(id)){ const el = document.createElement('button'); el.className = 'card'; el.type = 'button'; const img = document.createElement('img'); img.alt = `${r} di ${s.name}`; img.loading = 'lazy'; img.decoding = 'async'; const src = imgSrc(r, s.id); if(src){ img.src = src; } else { img.src = cardSVG(r, s.id); } el.appendChild(img); if(removed.has(id)) el.classList.add('removed'); const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = removed.has(id) ? 'morta' : 'viva'; el.appendChild(badge); el.addEventListener('click', ()=>{ if(removed.has(id)) removed.delete(id); else removed.add(id); save(); updateCounts(); render(); layout(); }); wrapper.appendChild(el); } else { const ph = document.createElement('div'); ph.className = 'placeholder'; wrapper.appendChild(ph); } grid.appendChild(wrapper); } }
     } else {
-      for(const r of ranksAxis){ for(const s of suitsAxis){ const id = r + s.id; const wrapper = document.createElement('div'); wrapper.className = 'cell'; if(cardMatchesFilter(id)){ const el = document.createElement('button'); el.className='card'; el.type='button'; const img=document.createElement('img'); img.alt=`${r} di ${s.name}`; img.loading='lazy'; img.decoding='async'; img.src=cardSVG(r, s.id); el.appendChild(img); if(removed.has(id)) el.classList.add('removed'); const badge=document.createElement('span'); badge.className='badge'; badge.textContent = removed.has(id)?'morta':'viva'; el.appendChild(badge); el.addEventListener('click', ()=>{ if(removed.has(id)) removed.delete(id); else removed.add(id); save(); updateCounts(); render(); layout(); }); wrapper.appendChild(el);} else { const ph=document.createElement('div'); ph.className='placeholder'; wrapper.appendChild(ph);} grid.appendChild(wrapper);} }
+      for(const r of ranksAxis){ for(const s of suitsAxis){ const id = r + '_' + s.id; const wrapper = document.createElement('div'); wrapper.className = 'cell'; if(cardMatchesFilter(id)){ const el = document.createElement('button'); el.className = 'card'; el.type = 'button'; const img = document.createElement('img'); img.alt = `${r} di ${s.name}`; img.loading = 'lazy'; img.decoding = 'async'; const src = imgSrc(r, s.id); if(src){ img.src = src; } else { img.src = cardSVG(r, s.id); } el.appendChild(img); if(removed.has(id)) el.classList.add('removed'); const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = removed.has(id) ? 'morta' : 'viva'; el.appendChild(badge); el.addEventListener('click', ()=>{ if(removed.has(id)) removed.delete(id); else removed.add(id); save(); updateCounts(); render(); layout(); }); wrapper.appendChild(el); } else { const ph = document.createElement('div'); ph.className = 'placeholder'; wrapper.appendChild(ph); } grid.appendChild(wrapper); } }
     }
   }
 
@@ -275,12 +238,14 @@
     let cardW; if(cfg.colsBy==='suit'){ cardW = Math.max(48, cardW_fromW); } else { cardW = Math.max(48, Math.min(cardW_fromW, cardW_fromH)); }
     const cardH = Math.floor(cardW * 88 / 63);
     grid.style.gridTemplateColumns = `repeat(${colsTarget}, ${cardW}px)`; grid.style.gridAutoRows = `${cardH}px`;
-    document.getElementById('layout-info').textContent = `${colsTarget}×${rowsTarget} ~ ${cardW}×${cardH}px (${cfg.colsBy==='rank'?'13×4-style':'4×13-style'}) [${activeDeck.name}] [filter:${filterMode}]`;
+    document.getElementById('layout-info').textContent = `${colsTarget}×${rowsTarget} ~ ${cardW}×${cardH}px (${activeDeck.name}) [${cfg.colsBy==='rank'?'13×4-style':'4×13-style'}] [filter:${filterMode}]`;
   }
+
+  function min(a,b){ return a<b?a:b; }
 
   // Buttons
   document.getElementById('reset').onclick = ()=>{ removed = new Set(); save(); updateCounts(); render(); layout(); };
-  document.getElementById('inverti').onclick = ()=>{ const newSet = new Set(); for(const r of activeDeck.ranks){ for(const s of activeDeck.suits){ const id = r + s.id; if(!removed.has(id)) newSet.add(id); } } removed = newSet; save(); updateCounts(); render(); layout(); };
+  document.getElementById('inverti').onclick = ()=>{ const newSet = new Set(); for(const r of activeDeck.ranks){ for(const s of activeDeck.suits){ const id = r + '_' + s.id; if(!removed.has(id)) newSet.add(id); } } removed = newSet; save(); updateCounts(); render(); layout(); };
   document.getElementById('soloVive').onclick = ()=>{ filterMode='live'; render(); layout(); };
   document.getElementById('soloMorte').onclick = ()=>{ filterMode='dead'; render(); layout(); };
   document.getElementById('tutte').onclick = ()=>{ filterMode='all'; render(); layout(); };
